@@ -1,0 +1,19 @@
+// SPDX-License-Identifier: BSD-3-Clause
+// Copyright (c) 2026 HexQuoridor-3P contributors
+plugins { id 'application' }
+repositories { mavenCentral() }
+dependencies {
+    implementation 'org.java-websocket:Java-WebSocket:1.6.0'
+    implementation 'com.google.code.gson:gson:2.13.2'
+    runtimeOnly 'org.slf4j:slf4j-simple:2.0.17'
+}
+java { sourceCompatibility = JavaVersion.VERSION_21; targetCompatibility = JavaVersion.VERSION_21 }
+application { mainClass = 'hexquoridor.Server' }
+tasks.withType(JavaCompile).configureEach { options.release = 21 }
+tasks.register('engineTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'hexquoridor.EngineTest'
+}
+tasks.named('test') { dependsOn engineTest; failOnNoDiscoveredTests = false }
+tasks.named('run') { dependsOn ':clientBuild'; workingDir = rootProject.projectDir }

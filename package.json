@@ -1,0 +1,20 @@
+{
+  "name": "hexquoridor-3p",
+  "private": true,
+  "license": "BSD-3-Clause",
+  "packageManager": "pnpm@10.6.3",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "pnpm --dir client build",
+    "test": "node scripts/java.mjs test && node scripts/network-test.mjs",
+    "test:browser": "node scripts/browser-test.mjs",
+    "postinstall": "node scripts/check-size.mjs",
+    "postbuild": "node scripts/check-size.mjs",
+    "size": "node scripts/check-size.mjs",
+    "start": "node scripts/java.mjs run",
+    "check": "pnpm --dir client check"
+  },
+  "devDependencies": {
+    "playwright-core": "1.56.1"
+  }
+}
