@@ -14,10 +14,11 @@ export default function App() {
   const [rules, setRules] = createSignal(false);
   const [copied, setCopied] = createSignal(false);
   const [dismissed, setDismissed] = createSignal(false);
+  const [oneTurnBot, setOneTurnBot] = createSignal('greedy');
   const rotate = (delta: number) => setOrientation(value => (value + delta + 3) % 3);
-  function startLocal() {
+  function startLocal(bots?: string[]) {
     const url = new URL(location.href); url.searchParams.delete('room'); history.replaceState(null, '', url);
-    setWallMode(false); setDismissed(false); game.join(randomRoom(), 'local');
+    setWallMode(false); setDismissed(false); game.join(randomRoom(), 'local', bots);
   }
   function online(id: string) {
     if (!/^[a-zA-Z0-9_-]{1,32}$/.test(id)) return;
@@ -60,7 +61,7 @@ export default function App() {
         <section class="board-panel" aria-label="Game area">
           <div class="board-toolbar"><div><span class="live-dot" classList={{online: game.ready()}}/>{game.status()}</div>
             <span class="round-label">TURN { (game.state()?.revision ?? 0) + 1 }</span></div>
-          <Show when={game.state()} fallback={<div class="connecting"><span class="loading-hex">⬡</span><p>{game.status()}</p><small>Start the Java server with pnpm start.</small><button onClick={startLocal}>Retry connection</button></div>}>
+          <Show when={game.state()} fallback={<div class="connecting"><span class="loading-hex">⬡</span><p>{game.status()}</p><small>Start the Java server with pnpm start.</small><button onClick={() => startLocal()}>Retry connection</button></div>}>
             {state => <HexGrid cells={game.cells()} catalog={game.catalog()} targets={game.targets()} state={state()}
               wallMode={wallMode() && !wallUnavailable()} orientation={orientation()} canAct={game.canAct()}
               rotate={rotate} move={id => game.action('MOVE_PAWN', {destination: id})}
@@ -71,7 +72,7 @@ export default function App() {
         <aside class="sidebar">
           <div class="turn-card" style={{'--accent': COLORS[turn()]}}><p class="eyebrow">{game.state()?.winner !== undefined && game.state()!.winner >= 0 ? 'WINNER' : 'UP NEXT'}</p>
             <h2><span class="player-badge" style={{background: COLORS[turn()]}}>P{turn()}</span>{NAMES[turn()]}</h2>
-            <p>{game.mode() === 'local' ? 'Pass the device after your move.' : game.seat() === turn() ? 'Your turn. Make it count.' : 'You are P' + game.seat() + ' · Watch the board.'}</p>
+            <p>{game.mode() === 'local' ? game.controllers()[turn()] !== 'human' ? game.controllers()[turn()].toUpperCase() + ' is choosing a move.' : game.controllers().some(c => c !== 'human') ? 'Your turn. The bots will move automatically.' : 'Pass the device after your move.' : game.seat() === turn() ? 'Your turn. Make it count.' : 'You are P' + game.seat() + ' · Watch the board.'}</p>
           </div>
           <section class="players"><div class="section-label"><h3>The chase</h3><span>WALLS LEFT</span></div>
             <For each={NAMES}>{(name, p) => <div class="player-row" classList={{current: turn() === p()}} style={{'--accent': COLORS[p()]}}>
@@ -83,12 +84,22 @@ export default function App() {
             <button classList={{selected: !wallMode() || wallUnavailable()}} onClick={() => setWallMode(false)}><span>↗</span> Move pawn <kbd>M</kbd></button>
             <button disabled={wallUnavailable()} classList={{selected: wallMode() && !wallUnavailable()}} onClick={() => setWallMode(true)}><span>⌁</span> Place wall <kbd>W</kbd></button>
           </div><Show when={wallMode() && !wallUnavailable()}><div class="orientation"><span>Orientation</span><For each={[0,1,2]}>{i => <button classList={{selected: orientation() === i}} onClick={() => setOrientation(i)} aria-label={'Orientation ' + (i+1)}>{['⌜','⌝','⌞'][i]}<small>{i+1}</small></button>}</For></div></Show>
-            <Show when={game.mode() === 'local'}><button class="bot-button" disabled={!game.canAct()} onClick={() => game.action('BOT_MOVE')}>Let a bot take this turn <span>→</span></button></Show>
+            <Show when={game.mode() === 'local'}><div class="single-bot"><label for="single-bot">One-turn assistant</label><select id="single-bot" value={oneTurnBot()} onChange={e => setOneTurnBot(e.currentTarget.value)}><For each={game.botCatalog()}>{bot => <option value={bot.id} disabled={!bot.available}>{bot.name}{bot.available ? '' : ' · unavailable'}</option>}</For></select></div>
+              <button class="bot-button" disabled={!game.canAct()} onClick={() => game.action('BOT_MOVE', {bot: oneTurnBot()})}>Let a bot take this turn <span>→</span></button></Show>
           </section>
+          <Show when={game.mode() === 'local'}><section class="bot-opponents"><div class="section-label"><h3>Bot opponents</h3><span>LOCAL TABLE</span></div>
+            <For each={NAMES}>{(name, p) => <label class="bot-seat"><span>P{p()} · {name}</span><select aria-label={'P' + p() + ' controller'} value={game.controllers()[p()]} disabled={!game.joined()} onChange={e => {
+              const controllers = [...game.controllers()];controllers[p()] = e.currentTarget.value;game.action('SET_BOTS', {controllers});
+            }}><option value="human">Human</option><For each={game.botCatalog()}>{bot => <option value={bot.id} disabled={!bot.available}>{bot.name}</option>}</For></select></label>}</For>
+            <button class="bot-match" disabled={!game.joined() || !game.botCatalog().filter(b => ['cnn','nnue'].includes(b.id)).every(b => b.available) || game.botCatalog().length === 0} onClick={() => startLocal(['human','cnn','nnue'])}>Play against CNN + NNUE <span>→</span></button>
+            <button class="bot-button" disabled={!game.joined()} onClick={() => game.action('SET_BOTS', {controllers: ['human','human','human']})}>Pause bots · return all seats to Human</button>
+            <p class="bot-note">Locally trained from teacher self-play. Experimental strength.</p>
+            <Show when={game.lastBot().id}><p class="bot-note">Last move: {game.lastBot().id?.toUpperCase()} · {Math.round(game.lastBot().millis ?? 0)} ms</p></Show>
+          </section></Show>
           <section class="room-panel"><div class="section-label"><h3>{game.mode() === 'local' ? 'Local table' : 'Online room'}</h3><span>{game.mode() === 'local' ? 'PASS & PLAY' : 'YOU: P' + game.seat()}</span></div>
             <Show when={game.mode() === 'online'}><div class="room-code"><code>{game.room()}</code><button onClick={copy}>{copied() ? 'Copied!' : 'Copy invite'}</button></div></Show>
             <form onSubmit={event => { event.preventDefault(); online(roomInput().trim()); }}><label for="room">Join friends by room code</label><div class="join-row"><input id="room" maxlength="32" placeholder="e.g. friday-night" pattern="[a-zA-Z0-9_-]{1,32}" required value={roomInput()} onInput={e => setRoomInput(e.currentTarget.value)}/><button type="submit">Join</button></div></form>
-            <div class="room-buttons"><button onClick={() => online(randomRoom())}>Create online room</button><button onClick={startLocal}>New local game</button></div>
+            <div class="room-buttons"><button onClick={() => online(randomRoom())}>Create online room</button><button onClick={() => startLocal()}>New local game</button></div>
           </section>
           <Show when={game.error()}><div class="error" role="alert">{game.error()}</div></Show>
         </aside>
@@ -100,6 +111,6 @@ export default function App() {
       <p class="modal-note">Select Place wall, then hover a vertex. Press R, scroll, or use 1–3 to rotate. Red previews are illegal. Online games pause when a player disconnects; reopening the same room in the same tab restores their seat.</p>
       <button class="primary" onClick={() => setRules(false)}>Back to the board</button>
     </section></div></Show>
-    <Show when={game.state() && game.state()!.winner >= 0 && !dismissed()}><div class="modal-overlay"><section class="modal winner-modal" role="dialog" aria-modal="true" aria-label="Game winner"><p class="eyebrow">THE CHASE IS OVER</p><div class="winner-token" style={{color: COLORS[game.state()!.winner]}}>⬡</div><h2>{NAMES[game.state()!.winner]} wins.</h2><p>P{game.state()!.winner} reached their target in {game.state()!.revision} total turns.</p><button class="primary" autofocus onClick={startLocal}>Play a new local game</button><button class="text-button" onClick={() => setDismissed(true)}>Review the final board</button></section></div></Show>
+    <Show when={game.state() && game.state()!.winner >= 0 && !dismissed()}><div class="modal-overlay"><section class="modal winner-modal" role="dialog" aria-modal="true" aria-label="Game winner"><p class="eyebrow">THE CHASE IS OVER</p><div class="winner-token" style={{color: COLORS[game.state()!.winner]}}>⬡</div><h2>{NAMES[game.state()!.winner]} wins.</h2><p>P{game.state()!.winner} reached their target in {game.state()!.revision} total turns.</p><button class="primary" autofocus onClick={() => startLocal()}>Play a new local game</button><button class="text-button" onClick={() => setDismissed(true)}>Review the final board</button></section></div></Show>
   </div>;
 }

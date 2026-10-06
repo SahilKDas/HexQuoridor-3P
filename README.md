@@ -2,7 +2,7 @@
 
 A deterministic three-player hexagonal Quoridor game, built with Java 21+, a small HTTP/WebSocket server, and SolidJS + TypeScript + Vite. BSD 3-Clause.
 
-Play on one device, create a three-seat online room, or let a deterministic bot take any local turn. The server owns all rules, turns, legal actions, inventory, and victory detection. Accounts and ratings are intentionally outside this release.
+Play on one device, create a three-seat online room, or play against trained CNN and NNUE bots. The server owns all rules, turns, legal actions, inventory, and victory detection. Accounts and ratings are intentionally outside this release. See [the bot guide](docs/BOTS.md) for architectures, original handcrafted teachers, reproducible self-play training, and measured limitations.
 
 ## Run
 
@@ -44,7 +44,8 @@ Gradle 9.6.1 is pinned. Its distribution and dependency cache live in the standa
 
 - **Local:** the app opens a fresh pass-and-play table. Give the device to the next player after each action.
 - **Online:** select Create online room. Share Copy invite or the room code. The three connections get P0, P1, P2 in arrival order. All three must be connected for play.
-- **Bot testing:** Let a bot take this turn chooses a legal move with the shortest remaining graph distance; ties use the smallest cell index. It plays one action, then gives control back.
+- **Neural opponents:** Play against CNN + NNUE assigns P0 Human, P1 CNN, P2 NNUE. Assign any local seat through its controller dropdown; bots automatically take their turns. Pause bots cancels pending actions and returns every seat to Human.
+- **Bot testing:** One-turn assistant selects CNN, NNUE, a handcrafted teacher, or the original greedy baseline. Let a bot take this turn plays one legal action, then gives control back. The greedy baseline still uses shortest graph distance and stable cell-index ties.
 - **Walls:** choose Place wall, hover or tap a board vertex, then click to place. Press R or scroll to rotate; 1, 2, 3 select an orientation. Illegal previews turn red.
 - **Keyboard:** M selects movement, W walls, R rotates, 1–3 select orientation. Legal cells and wall vertices can be activated with Tab then Enter or Space. Escape closes the rules dialog.
 - **Reconnection:** a seat token lives in sessionStorage for that browser tab and room. Reloading preserves the room URL and seat; a disconnected player automatically retries with bounded backoff. A lost tab/token cannot reclaim an occupied reserved seat; start a new room.
@@ -117,12 +118,20 @@ server/src/main/java/hexquoridor/
   PathFinder.java           Early-exit BFS for all three targets
   GameSessionManager.java   Rooms, seats, reconnect tokens, turn/revision checks
   Server.java               JDK HttpServer + Java-WebSocket
+  BotSearch.java            Bounded multiplayer MaxN and handcrafted teachers
+  CnnNetwork.java           Trainable spatial hex CNN
+  NnueNetwork.java          Sparse efficiently updated neural evaluator
+  BotTraining.java          Seeded self-play and grouped validation/test splits
+  BotArena.java             Independent balanced-seat tournament
+  BotService.java           Verified checkpoint loading and bot registry
 server/src/test/java/hexquoridor/EngineTest.java
 client/src/
   HexGrid.tsx               Responsive SVG, pawns, goals, walls, previews
   useGameEngine.ts          WebSocket lifecycle and Solid signals
   App.tsx                   HUD, rooms, action controls, rules, victory dialog
 scripts/                    Lightweight launchers and verification
+models/                     Trained weights, synthetic self-play, measured reports
+docs/BOTS.md                Bot design, training, audit, and limitations
 ```
 
 ## JSON WebSocket protocol
@@ -147,14 +156,19 @@ The above state is a schema example, not the initial game coordinates. Subsequen
 {"type":"MOVE_PAWN","destination":42,"revision":0}
 {"type":"PLACE_WALL","wallId":17,"revision":1}
 {"type":"BOT_MOVE","revision":2}
+{"type":"BOT_MOVE","bot":"cnn","revision":2}
+{"type":"SET_BOTS","controllers":["human","cnn","nnue"],"revision":2}
 ```
 
-BOT_MOVE is local-only. Local JOIN uses mode local and one connection controls all three players. The server derives player identity from membership, never from a client-supplied player number. Stale revisions, illegal actions, wrong turns, invalid payloads, and actions before all online seats connect return ERROR without mutation. Winning actions broadcast GAME_OVER with the final state. There is no pass action.
+BOT_MOVE and SET_BOTS are local-only. BOT_MOVE defaults to the greedy baseline; optional bot IDs are cnn, nnue, racer, guardian, architect, greedy. Local JOIN may include a three-entry controllers array. WELCOME includes available bots; state broadcasts include controllers, thinking, botError, and lastBot. Configuring controllers does not consume a game turn. A human action cannot override an automatic bot's turn; returning its seat to Human cancels pending work. Local JOIN uses mode local and one connection controls the table. The server derives player identity from membership, never from a client-supplied player number. Stale revisions, illegal actions, wrong turns, invalid payloads, and actions before all online seats connect return ERROR without mutation. Winning actions broadcast GAME_OVER with the final state. There is no pass action.
 
 ## Verification
 
 ```sh
 pnpm test          # Java engine assertions + HTTP/WebSocket integration
+pnpm bots:verify   # Neural gradients, checkpoints, legal decisions, NNUE updates
+pnpm bots:train    # Handcrafted teacher self-play, CNN/NNUE training, tournament
+pnpm bots:arena 24 # Independent tournament, 24 games per lineup
 pnpm check         # Strict TypeScript checking
 pnpm build         # Production bundle + repository footprint guard
 pnpm test:browser  # Installed Chromium/Edge/Chrome, no browser downloads
@@ -170,15 +184,16 @@ The engine suite covers 91-cell topology, reciprocal neighbors, all 450 walls, s
 
 - [x] Minimal pnpm workspace with a committed lockfile.
 - [x] pnpm store lives inside .tools/pnpm-store, so its size is included.
-- [x] No database, Spring distribution, UI framework, image assets, or browser binaries.
+- [x] No database, Spring distribution, heavy UI framework, or browser binaries.
+- [x] CPU-only Java CNN/NNUE training and inference; no heavyweight ML runtime.
 - [x] Lightweight Java launcher uses only four jars.
-- [x] Production client bundle is approximately 39 KB before gzip.
+- [x] Production client bundle is approximately 42 KB before gzip.
 - [x] Size script includes .git, node_modules, .tools, .gradle, build and dist.
 - [x] Hard-linked files are counted conservatively per path; symbolic link targets are not traversed.
 - [x] Installation and production build run the size guard automatically.
 - [x] Guard fails at **1,000,000,000 bytes**, not at 1 GiB.
 
-The verified development repository, including the browser-testing package, dependency store, Gradle project cache, compiled artifacts, and screenshots, is approximately **148 MB**, leaving over 850 MB of headroom. Run pnpm size for the current exact total. Do not download full Gradle distributions, browser binaries, or unrelated caches into this repository.
+The development repository, including the browser-testing package, dependency store, Gradle project cache, compiled artifacts, screenshots, trained weights, and self-play corpus, is approximately **150 MB**, leaving more than 840 MB of headroom. Run pnpm size for the current exact total. Do not download full Gradle distributions, browser binaries, heavyweight ML runtimes, or unrelated caches into this repository.
 
 ## License
 

@@ -11,6 +11,13 @@ public final class GameState {
     private int turn=0, winner=-1;
     private long revision=0;
     public GameState() { for(int p=0;p<3;p++) pawns[p]=HexBoard.INSTANCE.spawn(p); }
+    public GameState copy() {
+        GameState result=new GameState();
+        System.arraycopy(pawns,0,result.pawns,0,3);System.arraycopy(remaining,0,result.remaining,0,3);
+        result.placed.addAll(placed);result.blocked.addAll(blocked);
+        result.turn=turn;result.winner=winner;result.revision=revision;return result;
+    }
+    GameState viewTurn(int player) { GameState result=copy();result.turn=player;return result; }
     public int pawn(int p) { return pawns[p]; }
     public int turn() { return turn; }
     public int winner() { return winner; }

@@ -1,0 +1,88 @@
+{
+  "method": "Independent seeded legal opening prefixes (35% random walls), cyclic seat rotation, third repetition/150-ply draw. CNN depth 3, NNUE/Guardian depth 4; bounded selective MaxN. Small local benchmark, not an ELO or state-of-the-art certification.",
+  "gamesPerLineup": 12,
+  "elapsedSeconds": 56.6335463,
+  "results": [
+    {
+      "winsByAgent": [
+        2,
+        4,
+        6
+      ],
+      "lineup": [
+        "cnn",
+        "nnue",
+        "guardian"
+      ],
+      "totalPlies": 492,
+      "draws": 0,
+      "meanActionMillis": [
+        34.099004294478526,
+        75.46785180722891,
+        66.87113067484663
+      ],
+      "games": 12
+    },
+    {
+      "winsByAgent": [
+        5,
+        3,
+        4
+      ],
+      "lineup": [
+        "cnn",
+        "greedy",
+        "greedy"
+      ],
+      "totalPlies": 365,
+      "draws": 0,
+      "meanActionMillis": [
+        37.399917213114755,
+        0.5158383333333333,
+        0.21210650406504064
+      ],
+      "games": 12
+    },
+    {
+      "winsByAgent": [
+        5,
+        2,
+        5
+      ],
+      "lineup": [
+        "nnue",
+        "greedy",
+        "greedy"
+      ],
+      "totalPlies": 368,
+      "draws": 0,
+      "meanActionMillis": [
+        83.72610731707317,
+        0.28098833333333334,
+        0.221872
+      ],
+      "games": 12
+    },
+    {
+      "winsByAgent": [
+        5,
+        2,
+        5
+      ],
+      "lineup": [
+        "guardian",
+        "greedy",
+        "greedy"
+      ],
+      "totalPlies": 334,
+      "draws": 0,
+      "meanActionMillis": [
+        82.14816181818182,
+        0.23626339285714287,
+        0.18277232142857144
+      ],
+      "games": 12
+    }
+  ],
+  "seed": 21261008
+}

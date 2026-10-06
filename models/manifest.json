@@ -1,0 +1,77 @@
+{
+  "format": 1,
+  "seed": 20261005,
+  "games": 180,
+  "generatedPositions": 8350,
+  "selfPlayWinsBySeat": [
+    66,
+    53,
+    61
+  ],
+  "selfPlayDraws": 0,
+  "drawRule": "Training only: 120 plies or third repetition; live rules unchanged",
+  "teachers": [
+    "RACER",
+    "GUARDIAN",
+    "ARCHITECT"
+  ],
+  "teacherSearch": "iterative-deepening MaxN, depth 4, beam 3 (root 6), 450-node budget, Zobrist transpositions, tempo-aware walls and progress-preserving pawn selection",
+  "opening": "2-10 seeded legal actions; 35% random legal walls, otherwise selective actions",
+  "target": "75% teacher MaxN utility + 25% actual self-play outcome; draws uniform",
+  "exploration": 0.07,
+  "split": "whole game id modulo 10: 80/10/10; canonical duplicate removal across splits",
+  "augmentation": "all three evaluation perspectives per state, including all relative sides to move",
+  "splitBeforeDeduplication": [
+    20166,
+    2673,
+    2211
+  ],
+  "trainPositions": 9000,
+  "validationPositions": 2673,
+  "testPositions": 2124,
+  "optimizer": "AdamW minibatch 32, initial learning rate 0.002, decay 0.97 per epoch, weight decay 0.0001, hidden dropout 25%",
+  "datasetSha256": "203123c0e0012942c2424c51e1362010385acd714c5f0ea5848cbf5683ccc5f9",
+  "models": {
+    "cnn": {
+      "architecture": "cnn",
+      "parameters": 1847,
+      "initialValidationLoss": 1.1565847080653855,
+      "validation": {
+        "crossEntropy": 1.07174765884185,
+        "brier": 0.13717777327198322,
+        "targetAgreement": 0.4882154882154882,
+        "examples": 2673
+      },
+      "test": {
+        "crossEntropy": 1.047191847880457,
+        "brier": 0.13887949403637073,
+        "targetAgreement": 0.5475517890772128,
+        "examples": 2124
+      },
+      "bestEpoch": 4,
+      "sha256": "3d04611c6b65f20e10604d41722d09ccc35b30795c749f700c0e88fd9bc5fa6b"
+    },
+    "nnue": {
+      "architecture": "nnue",
+      "parameters": 36899,
+      "initialValidationLoss": 1.110608331460521,
+      "validation": {
+        "crossEntropy": 1.1004507720882957,
+        "brier": 0.15587554260719644,
+        "targetAgreement": 0.44294799850355404,
+        "examples": 2673
+      },
+      "test": {
+        "crossEntropy": 1.055593711452071,
+        "brier": 0.14562108136521512,
+        "targetAgreement": 0.4712806026365348,
+        "examples": 2124
+      },
+      "bestEpoch": 1,
+      "sha256": "59f7f6080be5d178d517a71f17f7eb14e30377578e9e75dedb055b8cec229ec8"
+    }
+  },
+  "uniformCrossEntropy": 1.0986122886681098,
+  "elapsedSeconds": 492.2438986,
+  "strengthStatus": "Experimental, locally trained; no state-of-the-art or ELO claim."
+}

@@ -15,5 +15,11 @@ tasks.register('engineTest', JavaExec) {
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'hexquoridor.EngineTest'
 }
-tasks.named('test') { dependsOn engineTest; failOnNoDiscoveredTests = false }
+tasks.register('neuralTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'hexquoridor.BotTest'
+    workingDir = rootProject.projectDir
+}
+tasks.named('test') { dependsOn engineTest, neuralTest; failOnNoDiscoveredTests = false }
 tasks.named('run') { dependsOn ':clientBuild'; workingDir = rootProject.projectDir }

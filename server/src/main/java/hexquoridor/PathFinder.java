@@ -6,6 +6,18 @@ import java.util.Set;
 
 /** O(V+E), fixed-size queue, no recursion. Pawns do not block path validation. */
 public final class PathFinder {
+    public static int[] distances(int start,Set<Integer> blocked) {
+        int[] queue=new int[91],distance=new int[91];java.util.Arrays.fill(distance,-1);
+        int head=0,tail=0;queue[tail++]=start;distance[start]=0;HexBoard board=HexBoard.INSTANCE;
+        while(head<tail) {
+            int cell=queue[head++];
+            for(int direction=0;direction<6;direction++) {
+                int next=board.neighbor(cell,direction);
+                if(board.open(cell,next,blocked) && distance[next]<0) {distance[next]=distance[cell]+1;queue[tail++]=next;}
+            }
+        }
+        return distance;
+    }
     public static boolean exists(int start,int target,Set<Integer> blocked) {
         return distance(start,target,blocked)>=0;
     }

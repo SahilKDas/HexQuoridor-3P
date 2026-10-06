@@ -66,6 +66,7 @@ try {
   const after=await Promise.all(clients.map(c=>c.next('STATE')));
   assert.equal(after[0].state.remaining[1],5);assert.equal(after[0].state.turn,2);
   c.send({type:'BOT_MOVE',revision:2});assert.match((await c.next('ERROR')).message,/local only/);
+  c.send({type:'SET_BOTS',controllers:['human','cnn','nnue'],revision:2});assert.match((await c.next('ERROR')).message,/local only/);
   b.ws.close();assert.equal((await a.next('STATE')).ready,false);
   c.send({type:'MOVE_PAWN',destination:after[2].state.legalMoves[0],revision:2});
   assert.match((await c.next('ERROR')).message,/Waiting/);
@@ -73,7 +74,17 @@ try {
   assert.equal((await reconnect.next('WELCOME')).seat,1);
   assert.equal((await reconnect.next('STATE')).ready,true);
   const local=await connection();local.send({type:'JOIN',room:'local-integration',mode:'local'});
-  await local.next('WELCOME');let state=(await local.next('STATE')).state;
+  const localWelcome=await local.next('WELCOME');
+  assert.ok(localWelcome.bots.find(bot=>bot.id==='cnn' && bot.available));
+  assert.ok(localWelcome.bots.find(bot=>bot.id==='nnue' && bot.available));
+  let state=(await local.next('STATE')).state;
+  for(const bot of ['cnn','nnue']) {
+    local.send({type:'BOT_MOVE',bot,revision:state.revision});
+    const update=await local.next('STATE');assert.equal(update.lastBot.id,bot);
+    assert.equal(update.state.revision,state.revision+1);state=update.state;
+  }
+  local.send({type:'BOT_MOVE',bot:'random-untrained',revision:state.revision});await local.next('ERROR');
+  local.send({type:'SET_BOTS',controllers:['cnn','human'],revision:state.revision});await local.next('ERROR');
   local.send({type:'PLACE_WALL',wallId:state.legalWalls[0],revision:state.revision});
   state=(await local.next('STATE')).state;
   let won=false;
@@ -86,7 +97,20 @@ try {
   assert.ok(won,'deterministic bot reaches a winner');
   local.send({type:'MOVE_PAWN',destination:0,revision:state.revision});
   await local.next('ERROR');
-  console.log('PASS: HTTP health, room seats, authoritative turns, invalid/stale actions, state broadcasts, wall inventory, disconnect pause, saved-seat reconnect, bot full game, terminal actions');
+  const auto=await connection();auto.send({type:'JOIN',room:'automatic-neural',mode:'local',controllers:['human','cnn','nnue']});
+  await auto.next('WELCOME');let automatic=await auto.next('STATE');assert.equal(automatic.thinking,false);
+  auto.send({type:'MOVE_PAWN',destination:automatic.state.legalMoves[0],revision:0});
+  do {automatic=await auto.next('STATE');}while(automatic.state.revision<3);
+  assert.equal(automatic.state.turn,0);assert.equal(automatic.thinking,false);assert.equal(automatic.lastBot.id,'nnue');
+  assert.deepEqual(automatic.controllers,['human','cnn','nnue']);
+  auto.send({type:'SET_BOTS',controllers:['cnn','cnn','nnue'],revision:3});
+  automatic=await auto.next('STATE');assert.equal(automatic.thinking,true);
+  auto.send({type:'MOVE_PAWN',destination:automatic.state.legalMoves[0],revision:3});assert.match((await auto.next('ERROR')).message,/bot controls/);
+  auto.send({type:'SET_BOTS',controllers:['human','human','human'],revision:3});
+  automatic=await auto.next('STATE');assert.equal(automatic.thinking,false);
+  await delay(500);auto.clear();
+  auto.send({type:'BOT_MOVE',bot:'cnn',revision:3});automatic=await auto.next('STATE');assert.equal(automatic.state.revision,4);
+  console.log('PASS: HTTP health, room seats, authoritative turns, invalid/stale actions, state broadcasts, wall inventory, disconnect pause, saved-seat reconnect, bot full game, terminal actions, trained CNN/NNUE actions, automatic opponents, pause/cancellation, online bot restriction');
 } finally {
   sockets.forEach(socket=>socket.close());
   server.kill();

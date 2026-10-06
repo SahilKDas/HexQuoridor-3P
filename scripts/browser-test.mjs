@@ -74,6 +74,22 @@ try {
   assert.equal(await page.locator('.hex.legal').count(),0,'final board is terminal');
   await page.getByRole('button',{name:'New local game'}).click();
   await page.getByText('TURN 1',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Play against CNN + NNUE'}).click();
+  await page.waitForFunction(()=>document.querySelector('select[aria-label="P1 controller"]')?.value==='cnn' && document.querySelector('select[aria-label="P2 controller"]')?.value==='nnue');
+  assert.equal(await page.getByLabel('P1 controller').inputValue(),'cnn');
+  assert.equal(await page.getByLabel('P2 controller').inputValue(),'nnue');
+  await page.locator('.hex.legal').first().click();
+  await page.getByText('TURN 4',{exact:true}).waitFor();
+  assert.equal(await page.getByLabel('P0 controller').inputValue(),'human');
+  await page.getByRole('button',{name:'Pause bots · return all seats to Human'}).click();
+  await page.waitForFunction(()=>document.querySelector('select[aria-label="P1 controller"]')?.value==='human');
+  await page.locator('#single-bot').selectOption('cnn');
+  await page.getByRole('button',{name:'Let a bot take this turn'}).click();
+  await page.getByText('TURN 5',{exact:true}).waitFor();
+  await page.locator('#single-bot').selectOption('nnue');
+  await page.getByRole('button',{name:'Let a bot take this turn'}).click();
+  await page.getByText('TURN 6',{exact:true}).waitFor();
+  assert.ok(await page.getByText(/^Last move: NNUE/).count());
   await page.getByRole('button',{name:'Create online room'}).click();
   await page.getByText('YOU: P0',{exact:true}).waitFor();
   const room=await page.locator('.room-code code').textContent();
@@ -98,7 +114,7 @@ try {
   await page.getByText('Waiting for players',{exact:true}).waitFor();
   assert.equal(await other[0].locator('.hex.legal').count(),0,'disconnect pauses online play');
   assert.deepEqual(errors,[],'no browser exceptions or console errors');
-  console.log('PASS: desktop/mobile rendering, 91 hexes, pawn moves, wall hover/rotation/placement, HUD, full bot game, winner dialog, final board, new game, rules dialog, online three-player sync, seat reconnect and pause');
+  console.log('PASS: desktop/mobile rendering, 91 hexes, pawn moves, wall hover/rotation/placement, HUD, full bot game, winner dialog, final board, new game, rules dialog, CNN/NNUE opponents and controls, online three-player sync, seat reconnect and pause');
   console.log('Screenshots: .tools/screenshots/desktop.png and mobile.png');
 } finally {
   for(const ctx of contexts) await ctx.close();
